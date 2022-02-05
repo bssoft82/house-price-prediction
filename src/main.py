@@ -13,14 +13,14 @@ from ml_pipeline import predict_house_price
 # Global Variables
 # ---------------------------------------------------------------------------------------------------------------
 
-logging.basicConfig(filename="house_sale_price.log",
+logging.basicConfig(filename="../logs/house_sale_price.log",
                     format='%(asctime)s %(message)s',
                     filemode='a')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-train_data_file = "data/house-sales-train.csv"
-test_data_file = "data/house-sales-test.csv"
+train_data_file = "../data/house-sales-train.csv"
+test_data_file = "../data/house-sales-test.csv"
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -61,8 +61,8 @@ if __name__ == '__main__':
     train_data = load_train_data(spark);
     test_data = load_test_data(spark);
     df_predict = predict_house_price(train_data, test_data)
-    # df_predict.withColumnRenamed('prediction', 'SalePrice') \
-    #      .select('Id', 'SalePrice') \
-    #      .coalesce(1) \
-    #      .write.csv('submission', mode='overwrite', header=True)
-    # print(os.listdir('submission'))
+    df_predict.withColumnRenamed('prediction', 'SalePrice') \
+          .select('Id', 'SalePrice') \
+          .coalesce(1) \
+          .write.csv('submission', mode='overwrite', header=True)
+    print(os.listdir('submission'))

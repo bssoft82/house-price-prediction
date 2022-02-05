@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+from pyspark.python.pyspark.shell import sqlContext
 
 from pyspark.sql import SparkSession, functions as F, DataFrame
 from pyspark.ml.feature import StringIndexer, VectorAssembler, Imputer, VectorIndexer, Bucketizer, OneHotEncoder
@@ -45,26 +46,14 @@ def get_features(df_train):
     return str_features, int_features
 
 
-def count_missings(spark_df, sort=True):
-    """
-    Counts number of nulls and nans in each column
-    """
-    df = spark_df.select([F.count(F.when(F.isnan(c) | F.isnull(c), c)).alias(c) for (c, c_type) in spark_df.dtypes if
-                          c_type not in ('timestamp', 'string', 'date')]).toPandas()
-
-    if len(df) == 0:
-        logger.info("There are no any missing values!")
-        return None
-
-    if sort:
-        return df.rename(index={0: 'count'}).T.sort_values("count", ascending=False)
-    logger.info(df)
-    return df
+def count_missings(df):
+    null_vals = pd.isnull(df).sum()
+    logger.info(f'Null Values: {null_vals[null_vals > 0]}')
 
 
 def check_feature_cov(df_train):
     saleprice_cov = {}
-    for col in df_train.dtypes:
+    for col in df_train.columns:
         if col[0] != 'SalePrice' and col[1] != 'string':
             saleprice_cov[col[0]] = df_train.cov('SalePrice', col[0])
 
@@ -75,7 +64,7 @@ def check_feature_cov(df_train):
 
 def do_pca(df_train):
     # One Hot Encoding and nan transformation
-    data = pd.get_dummies(df_train.toPandas())
+    data = pd.get_dummies(df_train)
 
     imp = SimpleImputer(missing_values=np.nan, strategy='mean')
     data = imp.fit_transform(data)
@@ -84,9 +73,9 @@ def do_pca(df_train):
     np.seterr(invalid='ignore')
 
     # Log transformation
-    data = np.log(data)
-    labels = df_train.toPandas()["SalePrice"]
-    labels = np.log(labels)
+    #data = np.log(data)
+    #labels = df_train["SalePrice"]
+    #labels = np.log(labels)
 
     # Change -inf to 0 again
     data[data == -np.inf] = 0
@@ -105,41 +94,35 @@ def do_pca(df_train):
     return dataPCA
 
 
-def analyze_features(train_data):
-    count_missings(train_data)
-    saleprice_cov = check_feature_cov(train_data)
-    dataPCA = do_pca(train_data)
+def analyze_features(df):
+    # Count the column types
+    # logger.info(f'Count of Column Types: {df.dtypes.value_counts()}')
+
+    count_missings(df)
+    # saleprice_cov = check_feature_cov(df)
+    dataPCA = do_pca(df)
 
 
-def get_imputer(data):
-    imp = SimpleImputer(missing_values=np.nan, strategy='mean')
-    data = imp.fit_transform(data)
-    return data
+def one_hot_encoding(data):
+    #  One Hot Encoding and nan transformation
+    data = pd.get_dummies(data)
 
+    #imp = Imputer(missingValue='NaN', strategy='most_frequent')
+    imp = SimpleImputer(missing_values=np.NAN, strategy='mean', fill_value=None, verbose=0, copy=True)
+    data = imp.fit_transform(data.copy())
 
-def get_categorical_encoder():
-    pass
+    # Log transformation
+    data = np.log(data)
 
+    # Change -inf to 0 again
+    data[data == -np.inf] = 0
+    return pd.DataFrame(data)
 
-def get_assembler():
-    pass
-
-
-def get_vector_encoder():
-    pass
-
-
-def get_lr_model():
-    pass
-
-
-def get_ml_pipeline(train_data):
+def get_ml_pipeline(train_data, str_features, int_features):
     analyze_features(train_data)
 
-    str_features, int_features = get_features(train_data)
-
     # One Hot Encoding and nan transformation
-    data = pd.get_dummies(train_data.toPandas())
+    data = pd.get_dummies(train_data)
 
     _stages = []
 
@@ -190,7 +173,7 @@ def cast_to_int_1(_sdf, col_list: list):
 def cast_to_int_2(_sdf):
     for col in _sdf.dtypes:
         # _sdf[col] = _sdf[col].astype('int')
-        print(f'col: {col[0]}, col_type: {col[1]}')
+        #print(f'col: {col[0]}, col_type: {col[1]}')
         if col[1] != 'int':
             _sdf = _sdf.withColumn(col[0], _sdf[col[0]].cast(IntegerType))
     return _sdf
@@ -198,36 +181,34 @@ def cast_to_int_2(_sdf):
 
 def cast_to_int(_sdf):
     for col in _sdf.dtypes:
-        print(f'col: {col[0]}, col_type: {col[1]}')
+        #print(f'col: {col[0]}, col_type: {col[1]}')
         indexer = StringIndexer(inputCol=col[0], outputCol=col[0]+"1")
         indexed = indexer.fit(_sdf).transform(_sdf)
     return indexed
 
 
 def predict_house_price(train_data, test_data):
-    # train_data = pd.get_dummies(train_data)
-    # imp = SimpleImputer(missing_values='NaN', strategy='most_frequent')
-    # train_data = imp.fit_transform(train_data)
-    #
-    # test_data = pd.get_dummies(test_data)
-    # imp = SimpleImputer(missing_values='NaN', strategy='most_frequent')
-    # test_data = imp.fit_transform(test_data)
+    str_features_train, int_features_train = get_features(train_data)
+    #str_features_test, int_features_test = get_features(test_data)
 
-    # str_features_train, int_features_train = get_features(train_data)
-    # sdf_train_filter = train_data.select (str_features_train + int_features_train)
-    # train_data = cast_to_int(sdf_train_filter, int_features_train)
+    logger.debug (f'spark -> train_data: {train_data}')
+    train_data = train_data.toPandas()
+    test_data = test_data.toPandas()
 
-    # train_data = cast_to_int(train_data)
-    # test_data = cast_to_int(test_data)
+    logger.debug (f'pandas -> train_data: {train_data}')
+    train_data = one_hot_encoding(train_data)
+    test_data = one_hot_encoding(test_data)
 
-    pipeline = get_ml_pipeline(train_data)
+    logger.debug (f'encoded -> train_data: {train_data}')
+    pipeline = get_ml_pipeline(train_data, str_features_train, int_features_train)
     model = pipeline.fit(train_data)
     try:
         # str_features_test, int_features_test = get_features(test_data)
         # sdf_test_filter = test_data.select(str_features_test + int_features_test)
         # test_data = cast_to_int(sdf_test_filter, int_features_test)
 
-        df_predict = model.transform(test_data)
+        spark_dff = sqlContext.createDataFrame(test_data)
+        df_predict = model.transform(spark_dff)
         logger.info(f'df_predict: {df_predict.show(10)}')
     except Exception as e:
         logger.error("Exception occurred during transform %s", e.args[1])
