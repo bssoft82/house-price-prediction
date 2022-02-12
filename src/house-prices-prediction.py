@@ -9,11 +9,11 @@
 
 # COMMAND ----------
 
-!pip install pyspark
-!pip install numpy
-!pip install pandas
-!pip install matplotlib
-!pip install seaborn
+# !pip install pyspark
+# !pip install numpy
+# !pip install pandas
+# !pip install matplotlib
+# !pip install seaborn
 
 # COMMAND ----------
 
@@ -27,7 +27,7 @@ import pandas as pd
 
 import seaborn as sns
 import matplotlib.pyplot as plt
-%matplotlib inline
+#%matplotlib inline
 
 from pyspark.sql import SparkSession, functions as F, DataFrame
 from pyspark.sql.functions import *
@@ -58,13 +58,13 @@ spark
 # COMMAND ----------
 
 # Train data
-df_train = spark.read.csv('/FileStore/tables/house_sales_train.csv', inferSchema=True, header=True)
+df_train = spark.read.csv('../data/house-sales-train.csv', inferSchema=True, header=True)
 
 # Test data
-df_test = spark.read.csv('/FileStore/tables/house_sales_test.csv', inferSchema=True, header=True)
+df_test = spark.read.csv('../data/house-sales-test.csv', inferSchema=True, header=True)
 
 # Sample Submission
-df_sample_submission = spark.read.csv('/FileStore/tables/sample_submission.csv', inferSchema=True, header=True)
+df_sample_submission = spark.read.csv('../data/sample-submission.csv', inferSchema=True, header=True)
 
 # Columns to be part of Submission
 col_sample_submission = ['Id','SalePrice']
@@ -476,15 +476,16 @@ pred.toPandas().head()
 
 # save in databricks dbfs file system
 ct = datetime.datetime.now()
-pred.write.option("header",True).csv("dbfs:/FileStore/tables/submission-lr-"+str(ct)+".csv")
+#pred.write.option("header",True).csv("dbfs:/FileStore/tables/submission-lr-"+str(ct)+".csv")
 
 # save in local csv file
-pred.toPandas().to_csv("submission-lr-"+str(ct)+".csv")
+pred.toPandas().to_csv("../data/sample-submission-lr.csv")
 
 # COMMAND ----------
 
 # display few records from submission csv
-df_submission = spark.read.csv('/FileStore/tables/submission-lr-'+str(ct)+'.csv', inferSchema=True, header=True)
+#df_submission = spark.read.csv('/FileStore/tables/submission-lr-'+str(ct)+'.csv', inferSchema=True, header=True)
+df_submission = spark.read.csv('../data/sample-submission-lr.csv', inferSchema=True, header=True)
 df_submission.toPandas().head()
 
 # COMMAND ----------
@@ -542,10 +543,12 @@ pred.toPandas().head()
 
 # save in databricks dbfs file system
 ct = datetime.datetime.now()
-pred.write.option("header",True).csv("dbfs:/FileStore/tables/submission-rf-"+str(ct)+".csv")
+#pred.write.option("header",True).csv("dbfs:/FileStore/tables/submission-rf-"+str(ct)+".csv")
 
 # save in local csv file
-pred.toPandas().to_csv("submission-rf-"+str(ct)+".csv")
+pred.toPandas().to_csv("../data/sample-submission-rf.csv")
+df_submission = spark.read.csv('../data/sample-submission-rf.csv', inferSchema=True, header=True)
+df_submission.toPandas().head()
 
 # COMMAND ----------
 
